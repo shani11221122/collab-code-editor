@@ -1,29 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import MonacoEditor from '@monaco-editor/react';
+import socket from '../Socket';
 
-function Editor() {
-  // 1. Editor ke andar ka code state mein rakhte hain
-  const [code, setCode] = useState('// Start typing your code here...');
-  const [language, setLanguage] = useState('javascript');
+function Editor({ roomId }) {
+  const [code, setCode] = useState('// Start typing...');
+  
+  // 1. useRef taake hum "apna bheja hua change" dobara apply na karein
+  const isRemoteChange = useRef(false);
 
-  // 2. Ye function tab chalega jab user editor mein kuch type kare
+  // 2. Component mount hote hi room join karo, aur listener lagao
+  useEffect(() => {
+    socket.emit('join-room', roomId);
+
+    // 3. Jab server se doosre user ka change aaye
+    socket.on('receive-code-change', (newCode) => {
+      isRemoteChange.current = true; // flag lagao: ye humne khud nahi likha
+      setCode(newCode);
+    });
+
+    // 4. Cleanup: component unmount hote hi listener hatao
+    return () => {
+      socket.off('receive-code-change');
+    };
+  }, [roomId]);
+
   const handleEditorChange = (value) => {
-    setCode(value); // naya code state mein save karo
-    // Day 3 mein: yahan se hum socket.emit() bhi call karenge
+    setCode(value);
+
+    // 5. Agar ye change remote se nahi aaya (yani user ne khud type kiya)
+    //    tabhi server ko bhejo
+    if (!isRemoteChange.current) {
+      socket.emit('code-change', { roomId, code: value });
+    }
+    isRemoteChange.current = false; // reset
   };
 
   return (
     <MonacoEditor
       height="90vh"
-      language={language}
+      language="javascript"
       theme="vs-dark"
       value={code}
       onChange={handleEditorChange}
-      options={{
-        fontSize: 16,
-        minimap: { enabled: true },
-        automaticLayout: true, // window resize hone pe editor bhi resize ho
-      }}
     />
   );
 }
