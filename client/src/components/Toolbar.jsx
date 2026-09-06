@@ -1,4 +1,4 @@
-function Toolbar({ language, setLanguage }) {
+function Toolbar({ language, setLanguage, users = [] }) {
   const languages = ['javascript', 'python', 'cpp', 'java'];
 
   return (
@@ -15,9 +15,20 @@ function Toolbar({ language, setLanguage }) {
         ))}
       </select>
 
-      <button className="ml-auto bg-green-600 px-3 py-1 rounded">
-        Run Code {/* Day 8 mein functional banayenge */}
-      </button>
+      <div className="ml-auto flex items-center gap-2">
+        {users.map((u, i) => (
+          <span
+            key={i}
+            style={{ backgroundColor: u.color }}
+            className="px-2 py-1 rounded-full text-xs text-black font-medium"
+          >
+            {u.username}
+          </span>
+        ))}
+        <button className="bg-green-600 px-3 py-1 rounded">
+          Run Code {/* Day 8 mein functional banayenge */}
+        </button>
+      </div>
     </div>
   );
 }

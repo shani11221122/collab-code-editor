@@ -6,21 +6,32 @@ import Toolbar from '../components/Toolbar';
 import socket from '../socket';
 
 function RoomPage() {
-  const { roomId } = useParams(); // URL se roomId nikalo
+  const { roomId } = useParams();
   const [files, setFiles] = useState([]);
   const [activeFileId, setActiveFileId] = useState(null);
+  const [language, setLanguage] = useState('javascript');
+  const [users, setUsers] = useState([]);
 
-  // 1. Page load hote hi is room ki files fetch karo
   useEffect(() => {
     fetch(`http://localhost:5000/api/rooms/${roomId}/files`)
       .then((res) => res.json())
       .then((data) => {
         setFiles(data);
-        if (data.length > 0) setActiveFileId(data[0]._id); // pehli file khol do
+        if (data.length > 0) setActiveFileId(data[0]._id);
       });
   }, [roomId]);
 
-  // 2. Jab active file badle, purani file ka socket room chhodo
+  // Connected users ki list Toolbar ke liye yahan track karo
+  useEffect(() => {
+    socket.on('users-update', (updatedUsers) => {
+      setUsers(updatedUsers);
+    });
+
+    return () => {
+      socket.off('users-update');
+    };
+  }, [activeFileId]);
+
   const handleFileSwitch = (fileId) => {
     if (activeFileId) socket.emit('leave-file', activeFileId);
     setActiveFileId(fileId);
@@ -28,7 +39,7 @@ function RoomPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <Toolbar roomId={roomId} />
+      <Toolbar language={language} setLanguage={setLanguage} users={users} />
       <div className="flex flex-1">
         <Sidebar
           files={files}
