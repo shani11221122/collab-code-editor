@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import socket from '../socket';
 
-function Editor({ roomId }) {
+function Editor({ fileId }) {
   const [code, setCode] = useState('');
   const revisionRef = useRef(0);
   const isApplyingRemote = useRef(false);
@@ -24,7 +24,7 @@ function Editor({ roomId }) {
   }
 
   useEffect(() => {
-    socket.emit('join-room', roomId);
+    socket.emit('join-room',  fileId );
 
     socket.on('init-state', ({ revision }) => {
       revisionRef.current = revision;
@@ -44,7 +44,7 @@ function Editor({ roomId }) {
       socket.off('operation-ack');
       socket.off('init-state');
     };
-  }, [roomId]);
+  }, [fileId]);
 
   function handleEditorChange(newValue, event) {
     if (isApplyingRemote.current) {
@@ -63,7 +63,7 @@ function Editor({ roomId }) {
         return;
       }
 
-      socket.emit('operation', { roomId, op, revision: revisionRef.current });
+      socket.emit('operation', { fileId, op, revision: revisionRef.current });
     });
 
     setCode(newValue);

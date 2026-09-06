@@ -1,21 +1,13 @@
-import { useState } from 'react';
-import Editor from './components/Editor';
-import Sidebar from './components/Sidebar';
-import Toolbar from './components/Toolbar';
+import { Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import RoomPage from './pages/RoomPage';
 
 function App() {
-  const [language, setLanguage] = useState('javascript');
-
   return (
-    <div className="flex flex-col h-screen">
-      <Toolbar language={language} setLanguage={setLanguage} />
-      <div className="flex flex-1">
-        <Sidebar />
-        <div className="flex-1">
-          <Editor language={language} />
-        </div>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/room/:roomId" element={<RoomPage />} />
+    </Routes>
   );
 }
 

@@ -5,6 +5,11 @@ const http = require('http');           // NEW
 const { Server } = require('socket.io'); // NEW
 const connectDB = require('./src/config/db');
 const { transform } = require('./src/ot');
+const roomRoutes = require('./src/routes/roomRoutes');
+const File = require('./src/models/File'); // top pe add karein
+
+
+
 
 dotenv.config();
 connectDB();
@@ -12,7 +17,7 @@ connectDB();
 const app = express();
 app.use(cors());
 app.use(express.json());
-
+app.use('/api/rooms', roomRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
@@ -27,24 +32,45 @@ const io = new Server(server, {
 });
 
 // 3. Jab bhi koi naya client connect ho, ye function chalega
+const fileState = {}; // fileState[fileId] = { revision: 0, operations: [] }
+
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  // Ab client "fileId" ke sath join karega, poore room ke sath nahi
+  socket.on('join-file', async (fileId) => {
+    socket.join(fileId);
+    if (!fileState[fileId]) {
+      fileState[fileId] = { revision: 0, operations: [] };
+    }
 
-  // 4. Client ne "join-room" event bheja (roomId ke sath)
-  socket.on('join-room', (roomId) => {
-    socket.join(roomId); // is socket ko us room mein daal do
-    console.log(`${socket.id} joined room ${roomId}`);
+    // Current saved content bhej do taake naya joiner sync ho sake
+    const file = await File.findById(fileId);
+    socket.emit('init-file', {
+      content: file?.content || '',
+      revision: fileState[fileId].revision,
+    });
   });
 
-  // 5. Client ne code change bheja
-  socket.on('code-change', ({ roomId, code }) => {
-    // is socket ke ilawa room ke baaki sab members ko bhejo
-    socket.to(roomId).emit('receive-code-change', code);
+  socket.on('leave-file', (fileId) => {
+    socket.leave(fileId); // jab user doosri file pe switch kare
   });
 
-  // 6. Client disconnect ho gaya
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  socket.on('operation', ({ fileId, op, revision }) => {
+    const state = fileState[fileId];
+    let transformedOp = op;
+
+    const missedOps = state.operations.slice(revision);
+    for (const missedOp of missedOps) {
+      transformedOp = transform(transformedOp, missedOp);
+    }
+
+    state.operations.push(transformedOp);
+    state.revision++;
+
+    socket.to(fileId).emit('remote-operation', {
+      op: transformedOp,
+      revision: state.revision,
+    });
+    socket.emit('operation-ack', { revision: state.revision });
   });
 });
 
