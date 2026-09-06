@@ -1,39 +1,73 @@
 import { useEffect, useState, useRef } from 'react';
 import MonacoEditor from '@monaco-editor/react';
-import socket from '../Socket';
+import socket from '../socket';
 
 function Editor({ roomId }) {
-  const [code, setCode] = useState('// Start typing...');
-  
-  // 1. useRef taake hum "apna bheja hua change" dobara apply na karein
-  const isRemoteChange = useRef(false);
+  const [code, setCode] = useState('');
+  const revisionRef = useRef(0);
+  const isApplyingRemote = useRef(false);
+  const editorRef = useRef(null);
 
-  // 2. Component mount hote hi room join karo, aur listener lagao
+  // Operation ko actual editor text pe apply karna
+  // (Ye function upar rakha hai taake pehli nazar mein hi dikh jaye — 
+  //  warna hoisting ki wajah se neeche bhi kaam karta)
+  function applyOperationToEditor(op) {
+    isApplyingRemote.current = true;
+    setCode((prevCode) => {
+      if (op.type === 'insert') {
+        return prevCode.slice(0, op.pos) + op.char + prevCode.slice(op.pos);
+      } else if (op.type === 'delete') {
+        return prevCode.slice(0, op.pos) + prevCode.slice(op.pos + op.length);
+      }
+      return prevCode;
+    });
+  }
+
   useEffect(() => {
     socket.emit('join-room', roomId);
 
-    // 3. Jab server se doosre user ka change aaye
-    socket.on('receive-code-change', (newCode) => {
-      isRemoteChange.current = true; // flag lagao: ye humne khud nahi likha
-      setCode(newCode);
+    socket.on('init-state', ({ revision }) => {
+      revisionRef.current = revision;
     });
 
-    // 4. Cleanup: component unmount hote hi listener hatao
+    socket.on('remote-operation', ({ op, revision }) => {
+      applyOperationToEditor(op);
+      revisionRef.current = revision;
+    });
+
+    socket.on('operation-ack', ({ revision }) => {
+      revisionRef.current = revision;
+    });
+
     return () => {
-      socket.off('receive-code-change');
+      socket.off('remote-operation');
+      socket.off('operation-ack');
+      socket.off('init-state');
     };
   }, [roomId]);
 
-  const handleEditorChange = (value) => {
-    setCode(value);
-
-    // 5. Agar ye change remote se nahi aaya (yani user ne khud type kiya)
-    //    tabhi server ko bhejo
-    if (!isRemoteChange.current) {
-      socket.emit('code-change', { roomId, code: value });
+  function handleEditorChange(newValue, event) {
+    if (isApplyingRemote.current) {
+      isApplyingRemote.current = false;
+      setCode(newValue);
+      return;
     }
-    isRemoteChange.current = false; // reset
-  };
+
+    event.changes.forEach((change) => {
+      let op;
+      if (change.text.length > 0 && change.rangeLength === 0) {
+        op = { type: 'insert', pos: change.rangeOffset, char: change.text };
+      } else if (change.text.length === 0 && change.rangeLength > 0) {
+        op = { type: 'delete', pos: change.rangeOffset, length: change.rangeLength };
+      } else {
+        return;
+      }
+
+      socket.emit('operation', { roomId, op, revision: revisionRef.current });
+    });
+
+    setCode(newValue);
+  }
 
   return (
     <MonacoEditor
@@ -42,6 +76,7 @@ function Editor({ roomId }) {
       theme="vs-dark"
       value={code}
       onChange={handleEditorChange}
+      onMount={(editor) => (editorRef.current = editor)}
     />
   );
 }

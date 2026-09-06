@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const http = require('http');           // NEW
 const { Server } = require('socket.io'); // NEW
 const connectDB = require('./src/config/db');
+const { transform } = require('./src/ot');
 
 dotenv.config();
 connectDB();
