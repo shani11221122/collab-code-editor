@@ -47,6 +47,12 @@ function Editor({ fileId }) {
         [socketId]: { position, username, color },
       }));
     });
+    socket.on('file-restored', ({ content, revision }) => {
+     isApplyingRemote.current = true;
+       setCode(content);
+       revisionRef.current = revision;
+      });
+    
 
     return () => {
       socket.off('init-file');
@@ -54,6 +60,7 @@ function Editor({ fileId }) {
       socket.off('operation-ack');
       socket.off('remote-cursor');
       socket.emit('leave-file', fileId);
+      socket.off('file-restored');
     };
   }, [fileId]);
 

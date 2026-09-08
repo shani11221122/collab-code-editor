@@ -39,7 +39,7 @@ function RoomPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <Toolbar language={language} setLanguage={setLanguage} users={users} />
+      <Toolbar language={language} setLanguage={setLanguage} users={users} activeFileId={activeFileId} />
       <div className="flex flex-1">
         <Sidebar
           files={files}

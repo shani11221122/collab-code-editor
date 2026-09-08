@@ -8,6 +8,7 @@ const { transform } = require('./src/ot');
 const File = require('./src/models/File');
 const authRoutes = require('./src/routes/authRoutes');
 const roomRoutes = require('./src/routes/roomRoutes');
+const fileRoutes = require('./src/routes/fileRoutes');
 
 dotenv.config();
 connectDB();
@@ -17,45 +18,89 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'Server is running', time: new Date() });
+  res.json({ status: 'Server is running' });
 });
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/files', fileRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: 'http://localhost:5173' },
 });
 
-// In-memory state (Day 7 mein DB persistence add karenge)
-const fileState = {};   // fileState[fileId] = { revision: 0, operations: [] }
-const fileUsers = {};   // fileUsers[fileId] = { socketId: { username, color } }
+const fileState = {};
+const fileUsers = {};
 const colors = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#95E1D3', '#C589E8'];
+const saveTimers = {};
+
+function reconstructContent(baseContent, operations) {
+  let content = baseContent;
+  for (const op of operations) {
+    if (op.type === 'insert') {
+      content = content.slice(0, op.pos) + op.char + content.slice(op.pos);
+    } else if (op.type === 'delete') {
+      content = content.slice(0, op.pos) + content.slice(op.pos + op.length);
+    }
+  }
+  return content;
+}
+
+function scheduleSave(fileId, getCurrentContent) {
+  if (saveTimers[fileId]) clearTimeout(saveTimers[fileId]);
+  saveTimers[fileId] = setTimeout(async () => {
+    const content = getCurrentContent();
+    await File.findByIdAndUpdate(fileId, { content });
+    console.log(`Auto-saved file ${fileId}`);
+  }, 2000);
+}
+
+// Restore route (io chahiye isliye yahan hai, fileRoutes.js mein nahi)
+app.post('/api/files/:fileId/versions/:versionId/restore', async (req, res) => {
+  const file = await File.findById(req.params.fileId);
+  const version = file.versions.id(req.params.versionId);
+  if (!version) return res.status(404).json({ error: 'Version not found' });
+
+  file.content = version.content;
+  await file.save();
+
+  if (fileState[req.params.fileId]) {
+    fileState[req.params.fileId].baseContent = version.content;
+    fileState[req.params.fileId].operations = [];
+    fileState[req.params.fileId].revision++;
+  }
+
+  io.to(req.params.fileId).emit('file-restored', {
+    content: version.content,
+    revision: fileState[req.params.fileId]?.revision || 0,
+  });
+
+  res.json({ message: 'Restored', content: file.content });
+});
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join-file', async (fileId, username) => {
     socket.join(fileId);
-    socket.fileId = fileId; // disconnect ke waqt use karne ke liye yaad rakho
+    socket.fileId = fileId;
 
     if (!fileState[fileId]) {
-      fileState[fileId] = { revision: 0, operations: [] };
+      const file = await File.findById(fileId);
+      fileState[fileId] = {
+        revision: 0,
+        operations: [],
+        baseContent: file?.content || '',
+      };
     }
 
-    // Current saved content bhejo taake naya joiner sync ho sake
-    const file = await File.findById(fileId);
-    socket.emit('init-file', {
-      content: file?.content || '',
-      revision: fileState[fileId].revision,
-    });
+    const state = fileState[fileId];
+    socket.emit('init-file', { content: state.baseContent, revision: state.revision });
 
-    // Presence: is user ko color assign karo, sab ko updated list bhejo
     if (!fileUsers[fileId]) fileUsers[fileId] = {};
     const color = colors[Object.keys(fileUsers[fileId]).length % colors.length];
     fileUsers[fileId][socket.id] = { username: username || 'Guest', color };
-
     io.to(fileId).emit('users-update', Object.values(fileUsers[fileId]));
   });
 
@@ -75,12 +120,15 @@ io.on('connection', (socket) => {
 
     state.operations.push(transformedOp);
     state.revision++;
+    state.baseContent = reconstructContent(state.baseContent, [transformedOp]);
 
     socket.to(fileId).emit('remote-operation', {
       op: transformedOp,
       revision: state.revision,
     });
     socket.emit('operation-ack', { revision: state.revision });
+
+    scheduleSave(fileId, () => state.baseContent);
   });
 
   socket.on('cursor-move', ({ fileId, position }) => {
