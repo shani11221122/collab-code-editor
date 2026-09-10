@@ -2,7 +2,9 @@ node_modules
 .env
 .env.local
 npm-debug.log*
+*.log
 .DS_Store
 coverage
-package-lock.json
-pacjage.json
+
+# Local MongoDB data dir (dev only)
+.mongo-data/

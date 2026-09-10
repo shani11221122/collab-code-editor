@@ -1,30 +1,96 @@
 import VersionHistory from './VersionHistory';
+import { LANGUAGES } from '../lib/languages';
 
-function Toolbar({ language, setLanguage, users = [], activeFileId }) {
-  const languages = ['javascript', 'python', 'cpp', 'java'];
+function initialsOf(name) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0] || '?')[0] + (parts.length > 1 ? parts[parts.length - 1][0] : ''))
+    .toUpperCase();
+}
+
+function Toolbar({ roomId, language, setLanguage, users = [], activeFileId, onRun, running, connected = true, onCopyRoom }) {
+  const isReconnecting = connected === false;
 
   return (
-    <div className="flex items-center gap-3 bg-gray-800 text-white p-3">
-      <span className="font-semibold">Collab Editor</span>
+    <header className="cce-toolbar flex items-center gap-2.5">
+      {/* brand */}
+      <div className="cce-brand">
+        <span className="cce-brand-mark">{'</>'}</span>
+        <span>Collab</span>
+      </div>
+
+      {/* room id */}
+      <button
+        className="cce-room-pill"
+        onClick={onCopyRoom}
+        title="Copy room link"
+        aria-label="Copy room link"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="9" y="9" width="15" height="15" rx="2" />
+          <path d="M5 15v2m0 0M9 19l7 0" />
+        </svg>
+        <span className="cce-mono">{roomId}</span>
+      </button>
+
+      <span className="cce-vdivider self-stretch w-px bg-[#a8b3c80f]" />
+
+      {/* language */}
       <select
+        className="cce-select"
         value={language}
         onChange={(e) => setLanguage(e.target.value)}
-        className="bg-gray-700 px-2 py-1 rounded"
+        title="Language"
       >
-        {languages.map((lang) => (
-          <option key={lang} value={lang}>{lang}</option>
+        {Object.entries(LANGUAGES).map(([key, lang]) => (
+          <option key={key} value={key}>{lang.label}</option>
         ))}
       </select>
-      <div className="ml-auto flex items-center gap-2">
-        {users.map((u, i) => (
-          <span key={i} style={{ backgroundColor: u.color }} className="px-2 py-1 rounded-full text-xs text-black font-medium">
-            {u.username}
-          </span>
-        ))}
+
+      <span className="cce-vdivider self-stretch w-px bg-[#a8b3c80f]" />
+
+      {/* presence */}
+      <div className="ml-auto flex items-center gap-3">
         {activeFileId && <VersionHistory fileId={activeFileId} />}
-        <button className="bg-green-600 px-3 py-1 rounded">Run Code</button>
+
+        <div className="cce-avatar-stack">
+          {users.slice(0, 6).map((u, i) => (
+            <span
+              key={i}
+              className="cce-avatar"
+              style={{ background: u.color, color: initialsOf(u.username) && '#fff' }}
+              title={u.username}
+            >
+              {initialsOf(u.username)}
+            </span>
+          ))}
+          {users.length > 6 && (
+            <span className="cce-avatar" style={{ background: '#1c2434' }} title="More users">
+              +{users.length - 6}
+            </span>
+          )}
+        </div>
+
+        {/* connection state */}
+        <span className="cce-pill" title={isReconnecting ? 'Reconnecting…' : 'Connected'}>
+          <span className={`cce-dot ${isReconnecting ? 'cce-dot-reconnect' : 'cce-dot-live'}`} />
+          {isReconnecting ? 'Reconnecting' : 'Live'}
+        </span>
+
+        <button
+          className="cce-btn cce-btn-primary"
+          onClick={onRun}
+          disabled={running}
+          aria-label="Run code"
+        >
+          {running ? <span className="cce-spinner" /> : (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 6l1.5-5 5 3.5 6z" />
+            </svg>
+          )}
+          {running ? 'Running…' : 'Run'}
+        </button>
       </div>
-    </div>
+    </header>
   );
 }
 
