@@ -305,8 +305,10 @@ The Monaco editor uses a **custom theme** (`cce-dark`, defined in
   moved into Redis (documented in §3).
 - OT handles simple insert/delete; *ranged replacement* is split into
   delete+insert ops. Undo across peers is not yet operation-canceling level.
-- Executing code requires a Judge0 API key (`.env`); without it `/api/execute`
-  returns a 500. The UI shows the error in the terminal.
+- Executing code requires a Judge0 API key (`.env`). Empty code is rejected up
+  front with a friendly message; provider/network failures surface the real
+  reason in the terminal (e.g. *"Could not reach the Judge0 sandbox — check
+  your network and JUDGE0_API_KEY"*).
 - Auth exists (JWT + bcrypt) but room endpoints are open by design (link-sharing).
 
 **Interview talking points:**

@@ -85,6 +85,11 @@ function RoomPage() {
 
   // 3. Run the current file's content via the Judge0 execute service.
   const runCode = async () => {
+    if (!code || !code.trim()) {
+      setOutput('Nothing to run — write some code first.');
+      return;
+    }
+
     setRunning(true);
     setOutput('');
     try {
@@ -93,8 +98,21 @@ function RoomPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language: languageInfo(language).judge0 }),
       });
-      const data = await res.json();
-      setOutput(data.output || (data.error ? `Error: ${data.error}` : 'No output'));
+
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        // Non-JSON body (proxies/errors) — fall back to raw text
+        data = { error: `Execution failed (HTTP ${res.status}).` };
+      }
+
+      if (!res.ok) {
+        setOutput(data.error || `Execution failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      setOutput(data.output || data.error || 'No output');
     } catch (err) {
       setOutput(`Execution failed: ${err.message}`);
     } finally {
