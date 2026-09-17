@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: 'http://localhost:5000/api' });
+const api = axios.create({ baseURL: 'https://collab-code-editor-vv74.onrender.com' });
 
 // Har request ke sath automatically token attach kar do
 api.interceptors.request.use((config) => {
