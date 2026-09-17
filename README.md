@@ -22,32 +22,49 @@ MongoDB · Redis adapter · Jest**.
 ## 🚀 Quick start
 
 ```bash
-# Backend (port 5000)
-cd server
-npm install
-cp .env.example .env        # then edit MONGO_URI / JWT_SECRET
-npm run dev
+# 1) Install + prepare env (from repo root, or per-folder)
+npm run setup              # installs server + client deps
+cp server/.env.example server/.env   # set MONGO_URI / JWT_SECRET
 
-# Frontend (port 5173)
-cd client
-npm install
-npm run dev
+# 2) Backend (port 5000)
+npm run dev:server
+
+# 3) Frontend (port 5173, second terminal)
+npm run dev:client
 ```
 
 Open **http://localhost:5173**, click *Create a room*, share the link, and start
 typing together. Requires MongoDB on `127.0.0.1:27017` (Redis is optional —
-the server gracefully falls back to single-instance mode).
+the server gracefully falls back to single-instance mode). The server waits for
+the database before listening, so a misconfigured `MONGO_URI` shows up as a
+clear boot error instead of random API 500s.
+
+## ☁️ Deploy (Render — single web service)
+
+The Express server also serves the built React app (`client/dist`), so the whole
+project deploys as **one** Render web service.
+
+1. Create a **free MongoDB Atlas** cluster and get its **connection string**
+   (replace `<password>` with your real password).
+2. Push this repo to GitHub, then in Render pick **New → Web Service → repo**.
+3. Set environment variables (Render dashboard → Environment):
+   - `MONGO_URI` → `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/collab-editor?retryWrites=true&w=majority`
+   - `JWT_SECRET` → a long random string
+   - `NODE_ENV` → `production`
+4. Render runs `npm install && npm --prefix server install && npm --prefix client install && npm --prefix client run build` then `npm start` (see `render.yaml`).
+
+In production the built client uses **relative URLs** (`/api`, same-origin
+Socket.io), so it works on any domain with no code changes.
 
 ## 🧪 Tests
 
 ```bash
-cd server
 npm test        # 13 Jest unit tests for the OT conflict-resolution logic
 ```
 
 Also ships with `client/scripts/socket-e2e-test.cjs` — a two-client realtime
 E2E test (presence, OT broadcast, chat relay, reconnect) that runs against a
-live server:
+live server.
 
 ## 📚 Docs
 

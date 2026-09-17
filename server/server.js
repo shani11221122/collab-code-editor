@@ -2,8 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
+const mongoose = require('mongoose');
 
 const connectDB = require('./src/config/db');
 const setupRedisClients = require('./src/config/redis');
@@ -14,39 +17,53 @@ const roomRoutes = require('./src/routes/roomRoutes');
 const fileRoutes = require('./src/routes/fileRoutes');
 const executeRoutes = require('./src/routes/executeRoutes');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 
 const app = express();
-app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://collab-code-editor-inky.vercel.app'
-  ],
-  credentials: true
-}));
-connectDB();
-app.use(express.json());
+// Rooms are intentionally link-shareable, so CORS stays open. In dev this lets
+// the Vite dev server (localhost:5173) call the API; in prod the client is
+// served from the same origin anyway.
+app.use(cors({ origin: (_origin, cb) => cb(null, true) }));
+app.use(express.json({ limit: '2mb' }));
 app.use('/api/execute', executeRoutes);
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
+    db: dbConnected ? 'connected' : 'disconnected',
+    uptime: Math.round(process.uptime()),
+  });
 });
 
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/files', fileRoutes);
 
+// Production: serve the built React client so the WHOLE app runs on a single
+// service (Render web service). Falls back to API-only outside build folders.
+const clientDist = path.resolve(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback — non-API GET routes return index.html so client routing works
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  console.log(`[static] serving client build from ${clientDist}`);
+} else {
+  console.log('[static] client/dist not found — API-only mode (run `npm run build` in client/)');
+}
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'https://collab-code-editor-inky.vercel.app'
-    ],
+    origin: (_origin, cb) => cb(null, true),
     methods: ['GET', 'POST'],
-    credentials: true
-  }
+  },
 });
 
 /**
@@ -243,6 +260,19 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+async function startServer() {
+  // Wait for MongoDB BEFORE listening. Without this, a broken MONGO_URI would
+  // serve HTTP fine and then blow up as confusing 500s (room/file writes) and
+  // crash moments later — exactly the production bug this fixes.
+  await connectDB();
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('FATAL: could not start server:', error.message);
+  process.exit(1);
 });

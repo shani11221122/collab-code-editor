@@ -1,0 +1,26 @@
+# Render Blueprint — deploys the whole app (API + built client) as ONE web service.
+#
+# After creating the service, set these from the Render dashboard → Environment:
+#   MONGO_URI   → MongoDB Atlas connection string (REQUIRED, e.g. mongodb+srv://…)
+#   JWT_SECRET  → any long random string
+#   NODE_ENV    → production (set below automatically)
+#
+# git push to this repo on Render auto-builds: server deps → client build → boot.
+services:
+  - type: web
+    name: collab-code-editor
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm --prefix server install && npm --prefix client install && npm --prefix client run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URLS
+        sync: false

@@ -1,0 +1,17 @@
+{
+  "name": "collab-code-editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime collaborative code editor — React + Socket.io + MongoDB",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "setup": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "start": "node server/server.js",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "test": "npm --prefix server test"
+  }
+}

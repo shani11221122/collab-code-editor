@@ -5,7 +5,7 @@
  */
 const { io } = require('socket.io-client');
 
-const URL = 'http://localhost:5000';
+const URL = process.argv[2] || 'http://localhost:5000';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const once = (s, ev) => new Promise((r) => s.once(ev, r));

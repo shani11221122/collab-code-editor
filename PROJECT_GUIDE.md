@@ -235,6 +235,29 @@ npm install
 npm run dev                 # Vite → http://localhost:5173
 ```
 
+### Deploying to production (Render — single service)
+
+The Express server **also serves the built React app**, so the project deploys
+as ONE Render web service (see `render.yaml`):
+
+1. **MongoDB**: create a free **MongoDB Atlas** cluster → copy the connection
+   string (`mongodb+srv://<user>:<password>@<cluster>.mongodb.net/...`).
+2. Push this repo to GitHub → Render: **New → Web Service → your repo**.
+3. Set environment variables: `MONGO_URI` (Atlas string), `JWT_SECRET`,
+   `NODE_ENV=production`.
+4. Render's build command runs server + client installs and `npm run build`;
+   start command is `npm start` → `node server/server.js`.
+
+Important boot guarantee: `server.js` calls `await connectDB()` **before**
+`server.listen()`. A bad `MONGO_URI` therefore fails loudly at boot (with an
+Atlas connection hint) instead of producing random 500s — the exact bug that
+happens when the local `mongodb://127.0.0.1` default is deployed unchanged.
+
+The built client uses **relative URLs** (`/api`, same-origin Socket.io) in
+production (see `client/src/config.js`), so it works on any domain without
+rebuilding. Use `VITE_API_URL` / `VITE_SOCKET_URL` build env vars only for a
+split frontend/backend hosting setup.
+
 ### Tests & E2E
 
 ```bash
