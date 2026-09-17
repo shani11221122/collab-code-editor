@@ -18,7 +18,13 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://collab-code-editor-inky.vercel.app'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use('/api/execute', executeRoutes);
 
@@ -32,7 +38,14 @@ app.use('/api/files', fileRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: process.env.CLIENT_URL || 'http://localhost:5173' },
+  cors: {
+    origin: [
+      'http://localhost:5173',
+      'https://collab-code-editor-inky.vercel.app'
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 });
 
 /**

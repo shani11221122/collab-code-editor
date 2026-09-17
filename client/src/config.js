@@ -1,5 +1,3 @@
-// Central place for all environment URLs.
-// Change these once when moving between local/dev/production.
-export const API_URL = 'http://localhost:5000';
-export const SOCKET_URL = 'http://localhost:5000';
-export const CLIENT_URL = 'http://localhost:5173';
+export const API_URL = 'https://collab-code-editor-vv74.onrender.com';
+export const SOCKET_URL = 'https://collab-code-editor-vv74.onrender.com';
+export const CLIENT_URL = 'https://collab-code-editor-inky.vercel.app';
