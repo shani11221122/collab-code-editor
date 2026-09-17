@@ -15,7 +15,7 @@ const fileRoutes = require('./src/routes/fileRoutes');
 const executeRoutes = require('./src/routes/executeRoutes');
 
 dotenv.config();
-connectDB();
+
 
 const app = express();
 app.use(cors({
@@ -25,6 +25,7 @@ app.use(cors({
   ],
   credentials: true
 }));
+connectDB();
 app.use(express.json());
 app.use('/api/execute', executeRoutes);
 
